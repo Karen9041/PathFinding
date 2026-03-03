@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Analytics;
 
 /// <summary>
 /// A sorted linked list
@@ -25,6 +26,28 @@ public class SortedLinkedList<T> : LinkedList<T> where T:IComparable
     public void Add(T item)
     {
         // add your code here
+        LinkedListNode<T> node = new LinkedListNode<T>(item);
+        if(First == null)
+        {
+            AddFirst(node);
+        }
+        else
+        {
+            LinkedListNode<T> current = First;
+            while(current != null && current.Value.CompareTo(item) < 0)
+            {
+                current = current.Next;
+            }
+            if(current == null)
+            {
+                AddLast(node);
+            }
+            else
+            {
+                AddBefore(current, node);
+            }
+        }
+
     }
 
     /// <summary>
@@ -36,7 +59,26 @@ public class SortedLinkedList<T> : LinkedList<T> where T:IComparable
     public void Reposition(T item)
     {
         // add your code here
+        LinkedListNode<T> node = Find(item);
+        if(node == null || node.Previous == null)
+        {
+            return;
+        }
+        LinkedListNode<T> current = First;
+        while(current != null && current.Value.CompareTo(item) < 0)
+        {
+            current = current.Next;
+        }
+        if(current == null)
+        {
+            Remove(node);
+            AddLast(node);
+        }
+        else
+        {
+            Remove(node);
+            AddBefore(current, node);
+        }
     }
-
     #endregion
 }
