@@ -20,7 +20,7 @@ public class Waypoint : MonoBehaviour
     /// <param name="other">other collider</param>
     void OnTriggerEnter2D(Collider2D other)
     {
-
+        this.gameObject.GetComponent<SpriteRenderer>().color = Color.green;
     }
 
     /// <summary>

@@ -16,7 +16,8 @@ public class HUD : MonoBehaviour
 	/// </summary>
 	void Start()
 	{
-
+        // add as listener for path found event
+        EventManager.AddPathFoundListener(SetPathLength);
 	}
 
     /// <summary>
@@ -25,7 +26,7 @@ public class HUD : MonoBehaviour
     /// <param name="length">path length</param>
     void SetPathLength(float length)
     {
-
-
+        Debug.Log("HUD received length: " + length);
+        pathLengthText.text = "Path Length: " + length.ToString("F2");
     }
 }

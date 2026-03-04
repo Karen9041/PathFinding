@@ -13,6 +13,18 @@ public class Traveler : MonoBehaviour
 	
     // needed for the PathLength property
     float pathLength = 0;
+	LinkedList<Waypoint> path = null;
+
+    // movement support
+	const float BaseImpulseForceMagnitude = 2.0f;
+
+	//saved for efficiency
+	Rigidbody2D rb2d;
+	
+	//waypoint traversal support
+	Waypoint targetWaypoint = null;
+	bool searched = false;
+	Graph<Waypoint> graph ;
 	
     // events fired by class
     PathFoundEvent pathFoundEvent = new PathFoundEvent();
@@ -65,22 +77,72 @@ public class Traveler : MonoBehaviour
 	/// </summary>
 	public void Start()
 	{
-		Graph<Waypoint> graph = GraphBuilder.Graph;
-		Waypoint start = graph.Nodes[0].Value;
-		Waypoint end = graph.Nodes[graph.Count - 1].Value;
-		LinkedList<Waypoint> path = Search(start, end, graph);
-		Debug.Log("Path Length: " + pathLength);
-		Debug.Log(path.Count + " waypoints in path:");
-		foreach(Waypoint waypoint in path)
-		{
-			Debug.Log(waypoint.Id);
-		}
+		// save reference for efficiency
+		rb2d = GetComponent<Rigidbody2D>();
+		
+		EventManager.AddPathFoundInvoker(this);
+		EventManager.AddPathTraversalCompleteInvoker(this);
+		graph = GraphBuilder.Graph;
 	}
 	
-	#endregion
-	
-	#region Public methods
-	
+	void Update()
+{
+    if (!searched)
+    {
+        // 確保在第一幀 Update 才執行搜尋，此時所有物件的 Start (註冊) 都已完成
+		Waypoint start = graph.Nodes[0].Value;
+		Waypoint end = graph.Nodes[graph.Count - 1].Value;
+        
+		path = Search(start, end, graph);
+		SetTarget(path.First.Value);
+        searched = true;
+    }
+}
+
+    void OnTriggerStay2D(Collider2D waypointCollider)
+    {
+        if(targetWaypoint != null && waypointCollider.gameObject == targetWaypoint.gameObject)
+		{
+			// go to next target if there is one
+			if(path.Count > 0)
+			{
+				path.RemoveFirst();
+				if(path.Count > 0)
+				{
+					SetTarget(path.First.Value);
+				}
+				else
+				{
+					targetWaypoint = null;
+					rb2d.linearVelocity = Vector2.zero;
+					pathTraversalCompleteEvent.Invoke();
+				}
+			}
+		}
+    }
+
+	void SetTarget(Waypoint target)
+    {
+		targetWaypoint = target;
+		GoToTargetWaypoint();
+	}
+
+	void GoToTargetWaypoint()
+    {
+        // calculate direction to target waypoint and start moving toward it
+		Vector2 direction = new Vector2(
+			targetWaypoint.Position.x - transform.position.x,
+			targetWaypoint.Position.y - transform.position.y);
+		direction.Normalize();
+		rb2d.linearVelocity = Vector2.zero;
+		rb2d.AddForce(direction * BaseImpulseForceMagnitude, 
+			ForceMode2D.Impulse);
+	}
+
+    #endregion
+
+    #region Public methods
+
     /// <summary>
     /// Adds the given listener for the PathFoundEvent
     /// </summary>
@@ -173,6 +235,7 @@ public class Traveler : MonoBehaviour
 				// Display the distance for the current search node as the path 
 				// length in the scene (Hint: I used the HUD and the event 
 				// system to do this)
+				Debug.Log("Traveler is Invoking!");
 				pathFoundEvent.Invoke(currentSearchNode.Distance);
 				// Return a linked list of the waypoints from the start node to 
 				// the end node. Uncomment the line of code below, replacing

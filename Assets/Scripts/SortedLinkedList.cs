@@ -64,21 +64,10 @@ public class SortedLinkedList<T> : LinkedList<T> where T:IComparable
         {
             return;
         }
-        LinkedListNode<T> current = First;
-        while(current != null && current.Value.CompareTo(item) < 0)
-        {
-            current = current.Next;
-        }
-        if(current == null)
-        {
-            Remove(node);
-            AddLast(node);
-        }
-        else
-        {
-            Remove(node);
-            AddBefore(current, node);
-        }
+
+        T value = node.Value;
+        Remove(node);
+        Add(value);
     }
     #endregion
 }
