@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.PlayerLoop;
 using UnityEngine.UIElements;
 
 /// <summary>
@@ -14,12 +15,15 @@ public class Traveler : MonoBehaviour
     // needed for the PathLength property
     float pathLength = 0;
 	LinkedList<Waypoint> path = null;
+	LinkedList<Waypoint> traversalPath = null;
 
     // movement support
 	const float BaseImpulseForceMagnitude = 2.0f;
 
 	//saved for efficiency
 	Rigidbody2D rb2d;
+	[SerializeField]
+	GameObject explosionPrefab;
 	
 	//waypoint traversal support
 	Waypoint targetWaypoint = null;
@@ -79,7 +83,6 @@ public class Traveler : MonoBehaviour
 	{
 		// save reference for efficiency
 		rb2d = GetComponent<Rigidbody2D>();
-		
 		EventManager.AddPathFoundInvoker(this);
 		EventManager.AddPathTraversalCompleteInvoker(this);
 		graph = GraphBuilder.Graph;
@@ -92,9 +95,11 @@ public class Traveler : MonoBehaviour
         // 確保在第一幀 Update 才執行搜尋，此時所有物件的 Start (註冊) 都已完成
 		Waypoint start = graph.Nodes[0].Value;
 		Waypoint end = graph.Nodes[graph.Count - 1].Value;
-        
+
 		path = Search(start, end, graph);
-		SetTarget(path.First.Value);
+
+		traversalPath = new LinkedList<Waypoint>(path);
+		SetTarget(traversalPath.First.Value);
         searched = true;
     }
 }
@@ -104,17 +109,19 @@ public class Traveler : MonoBehaviour
         if(targetWaypoint != null && waypointCollider.gameObject == targetWaypoint.gameObject)
 		{
 			// go to next target if there is one
-			if(path.Count > 0)
+			if(traversalPath.Count > 0)
 			{
-				path.RemoveFirst();
-				if(path.Count > 0)
+				traversalPath.RemoveFirst();
+				if(traversalPath.Count > 0)
 				{
-					SetTarget(path.First.Value);
+					SetTarget(traversalPath.First.Value);
 				}
 				else
 				{
 					targetWaypoint = null;
 					rb2d.linearVelocity = Vector2.zero;
+					EventManager.AddPathTraversalCompleteListener(ExpodeIntermediateWaypoints);
+
 					pathTraversalCompleteEvent.Invoke();
 				}
 			}
@@ -137,6 +144,24 @@ public class Traveler : MonoBehaviour
 		rb2d.linearVelocity = Vector2.zero;
 		rb2d.AddForce(direction * BaseImpulseForceMagnitude, 
 			ForceMode2D.Impulse);
+	}
+
+	void ExpodeIntermediateWaypoints()
+	{
+		
+		if(path == null)
+		{
+			Debug.Log("no path");
+			return;
+		}
+		foreach(Waypoint waypoint in path)
+		{
+			if(waypoint != path.First.Value && waypoint != path.Last.Value)
+			{
+				Instantiate(explosionPrefab, waypoint.transform.position, Quaternion.identity);
+				Destroy(waypoint.gameObject);
+			}
+		}
 	}
 
     #endregion
@@ -235,7 +260,6 @@ public class Traveler : MonoBehaviour
 				// Display the distance for the current search node as the path 
 				// length in the scene (Hint: I used the HUD and the event 
 				// system to do this)
-				Debug.Log("Traveler is Invoking!");
 				pathFoundEvent.Invoke(currentSearchNode.Distance);
 				// Return a linked list of the waypoints from the start node to 
 				// the end node. Uncomment the line of code below, replacing

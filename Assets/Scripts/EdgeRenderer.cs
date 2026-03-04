@@ -57,4 +57,6 @@ public class EdgeRenderer : MonoBehaviour
             Destroy(lineRenderers[i]);
         }
     }
+
+
 }
