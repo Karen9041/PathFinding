@@ -26,6 +26,6 @@ public class HUD : MonoBehaviour
     /// <param name="length">path length</param>
     void SetPathLength(float length)
     {
-        pathLengthText.text = "Path Length: " + length.ToString("F2");
+        pathLengthText.text = "Path Length: " + length.ToString();
     }
 }

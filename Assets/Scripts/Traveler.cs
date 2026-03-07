@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.PlayerLoop;
-using UnityEngine.UIElements;
 
 /// <summary>
 /// A traveler
@@ -15,8 +13,7 @@ public class Traveler : MonoBehaviour
     // needed for the PathLength property
     float pathLength = 0;
 	LinkedList<Waypoint> path = null;
-	LinkedList<Waypoint> traversalPath = null;
-
+	LinkedListNode<Waypoint> currentTarget = null;
     // movement support
 	const float BaseImpulseForceMagnitude = 2.0f;
 
@@ -26,7 +23,6 @@ public class Traveler : MonoBehaviour
 	GameObject explosionPrefab;
 	
 	//waypoint traversal support
-	Waypoint targetWaypoint = null;
 	bool searched = false;
 	Graph<Waypoint> graph ;
 	
@@ -81,88 +77,41 @@ public class Traveler : MonoBehaviour
 	/// </summary>
 	public void Start()
 	{
-		// save reference for efficiency
-		rb2d = GetComponent<Rigidbody2D>();
 		EventManager.AddPathFoundInvoker(this);
 		EventManager.AddPathTraversalCompleteInvoker(this);
+		// save reference for efficiency
+		rb2d = GetComponent<Rigidbody2D>();
 		graph = GraphBuilder.Graph;
+
+
+
+	}
+
+	public void Update()
+	{
+		if (!searched)
+		{
+			//Find the start and end waypoints in the scene
+			Waypoint start = GameObject.FindGameObjectWithTag("Start").GetComponent<Waypoint>();
+			Waypoint end = GameObject.FindGameObjectWithTag("End").GetComponent<Waypoint>();
+			path = Search(start, end, graph);
+
+			//move to start position and start traversing path
+			transform.position = start.transform.position;
+			currentTarget = path.First;
+			SetTarget();
+			searched = true;
+		}
 	}
 	
-	void Update()
-{
-    if (!searched)
+
+    void OnTriggerEnter2D(Collider2D waypointCollider)
     {
-        // 確保在第一幀 Update 才執行搜尋，此時所有物件的 Start (註冊) 都已完成
-		Waypoint start = graph.Nodes[0].Value;
-		Waypoint end = graph.Nodes[graph.Count - 1].Value;
-
-		path = Search(start, end, graph);
-
-		traversalPath = new LinkedList<Waypoint>(path);
-		SetTarget(traversalPath.First.Value);
-        searched = true;
-    }
-}
-
-    void OnTriggerStay2D(Collider2D waypointCollider)
-    {
-        if(targetWaypoint != null && waypointCollider.gameObject == targetWaypoint.gameObject)
+        if(waypointCollider.gameObject == currentTarget.Value.gameObject)
 		{
-			// go to next target if there is one
-			if(traversalPath.Count > 0)
-			{
-				traversalPath.RemoveFirst();
-				if(traversalPath.Count > 0)
-				{
-					SetTarget(traversalPath.First.Value);
-				}
-				else
-				{
-					targetWaypoint = null;
-					rb2d.linearVelocity = Vector2.zero;
-					EventManager.AddPathTraversalCompleteListener(ExpodeIntermediateWaypoints);
-
-					pathTraversalCompleteEvent.Invoke();
-				}
-			}
+			SetTarget();
 		}
     }
-
-	void SetTarget(Waypoint target)
-    {
-		targetWaypoint = target;
-		GoToTargetWaypoint();
-	}
-
-	void GoToTargetWaypoint()
-    {
-        // calculate direction to target waypoint and start moving toward it
-		Vector2 direction = new Vector2(
-			targetWaypoint.Position.x - transform.position.x,
-			targetWaypoint.Position.y - transform.position.y);
-		direction.Normalize();
-		rb2d.linearVelocity = Vector2.zero;
-		rb2d.AddForce(direction * BaseImpulseForceMagnitude, 
-			ForceMode2D.Impulse);
-	}
-
-	void ExpodeIntermediateWaypoints()
-	{
-		
-		if(path == null)
-		{
-			Debug.Log("no path");
-			return;
-		}
-		foreach(Waypoint waypoint in path)
-		{
-			if(waypoint != path.First.Value && waypoint != path.Last.Value)
-			{
-				Instantiate(explosionPrefab, waypoint.transform.position, Quaternion.identity);
-				Destroy(waypoint.gameObject);
-			}
-		}
-	}
 
     #endregion
 
@@ -336,6 +285,52 @@ public class Traveler : MonoBehaviour
 
         return path;
     }
+
+	/// <summary>
+	/// Sets the current target to the next waypoint on the path. If the target is null, then we've reached the end of the path, so we stop moving and fire the PathTraversalCompleteEvent
+	/// </summary>
+	/// <param name="target"></param>
+	void SetTarget()
+    {
+		currentTarget = currentTarget.Next;
+		if(currentTarget == null)
+		{
+			// reached end, blow up waypoints on path
+            rb2d.linearVelocity = Vector2.zero;
+            pathTraversalCompleteEvent.Invoke();
+			ExpodeIntermediateWaypoints();
+		}
+		else
+		{
+			// calculate direction to target waypoint and start moving toward it
+			Vector2 direction = new Vector2(
+				currentTarget.Value.transform.position.x - transform.position.x,
+				currentTarget.Value.transform.position.y - transform.position.y);
+			direction.Normalize();
+			rb2d.linearVelocity = Vector2.zero;
+			rb2d.AddForce(direction * BaseImpulseForceMagnitude, 
+				ForceMode2D.Impulse);
+		}
+	}
+	/// <summary>
+	/// Blows up the intermediate waypoints on the path (i.e. all waypoints except the start and end waypoints)
+	/// </summary>
+	void ExpodeIntermediateWaypoints()
+	{
+		// take start and end nodes out of path
+        path.RemoveFirst();
+        path.RemoveLast();
+
+        // blow up waypoints on path
+        LinkedListNode<Waypoint> currentWaypoint = path.First;
+        while (currentWaypoint != null)
+        {
+            Instantiate(explosionPrefab, currentWaypoint.Value.transform.position,
+                Quaternion.identity);
+            Destroy(currentWaypoint.Value.gameObject);
+            currentWaypoint = currentWaypoint.Next;
+        }
+	}
 	
 	#endregion
 }
